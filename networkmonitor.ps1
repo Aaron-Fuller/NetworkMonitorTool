@@ -22,21 +22,37 @@ function Log-ToFile {
 
 function Check-Network {
     $issuesDetected = $false
-
     $issueMessages = @() # Array to hold issue messages
 
-    # ICMP ping to check for packet loss
-    try {
-        $ping = New-Object System.Net.NetworkInformation.Ping
-        $reply = $ping.Send("www.google.com")
+    # Enhanced ICMP ping to check for packet loss and latency
+    $pingCount = 5
+    $pingTimeout = 1000  # 1 second in milliseconds
+    $ping = New-Object System.Net.NetworkInformation.Ping
 
-        if ($reply.Status -ne [System.Net.NetworkInformation.IPStatus]::Success) {
-            $issueMessages += "ICMP ping failed: Packet loss detected."
-            $issuesDetected = $true
+    $successfulPings = 0
+    $totalRTT = 0
+    $minRTT = [int]::MaxValue
+    $maxRTT = 0
+
+    for ($i = 0; $i -lt $pingCount; $i++) {
+        $reply = $ping.Send("www.google.com", $pingTimeout)
+        
+        if ($reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
+            $successfulPings++
+            $totalRTT += $reply.RoundtripTime
+            $minRTT = [math]::Min($minRTT, $reply.RoundtripTime)
+            $maxRTT = [math]::Max($maxRTT, $reply.RoundtripTime)
         }
     }
-    catch {
-        $issueMessages += "ICMP ping error: $($_.Exception.Message)"
+
+    $packetLossPercentage = (($pingCount - $successfulPings) / $pingCount) * 100
+    $averageRTT = $totalRTT / $successfulPings
+
+    if ($packetLossPercentage -gt 0) {
+        $issueMessages += "ICMP ping: $packetLossPercentage% packet loss detected. Avg RTT: $averageRTT ms (Min: $minRTT ms, Max: $maxRTT ms)"
+        $issuesDetected = $true
+    } elseif ($averageRTT -gt 100) {  # Assuming a threshold of 100ms for high latency.
+        $issueMessages += "ICMP ping: High latency detected. Avg RTT: $averageRTT ms (Min: $minRTT ms, Max: $maxRTT ms)"
         $issuesDetected = $true
     }
 
