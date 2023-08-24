@@ -1,4 +1,6 @@
 # Function Definitions
+
+# Log messages to a specified file and handle file rotation if size exceeds limit
 function Log-ToFile {
     param (
         [string]$Path,
@@ -20,6 +22,7 @@ function Log-ToFile {
     }
 }
 
+# Check various network parameters and log any detected issues
 function Check-Network {
     $issuesDetected = $false
     $issueMessages = @() # Array to hold issue messages
@@ -35,19 +38,32 @@ function Check-Network {
     $maxRTT = 0
 
     for ($i = 0; $i -lt $pingCount; $i++) {
-        $reply = $ping.Send("www.google.com", $pingTimeout)
-        
-        if ($reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
-            $successfulPings++
-            $totalRTT += $reply.RoundtripTime
-            $minRTT = [math]::Min($minRTT, $reply.RoundtripTime)
-            $maxRTT = [math]::Max($maxRTT, $reply.RoundtripTime)
+        try {
+            $reply = $ping.Send("www.google.com", $pingTimeout)
+            
+            if ($reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
+                $successfulPings++
+                $totalRTT += $reply.RoundtripTime
+                $minRTT = [math]::Min($minRTT, $reply.RoundtripTime)
+                $maxRTT = [math]::Max($maxRTT, $reply.RoundtripTime)
+            }
+        }
+        catch {
+            $issueMessages += "ICMP ping error: Unable to send ping request. Network might be down."
+            $issuesDetected = $true
+            break  # Exit the loop early since there's no point in sending more pings
         }
     }
 
-    $packetLossPercentage = (($pingCount - $successfulPings) / $pingCount) * 100
-    $averageRTT = $totalRTT / $successfulPings
+    # Calculate average RTT if there are successful pings
+    if ($successfulPings -gt 0) {
+        $averageRTT = $totalRTT / $successfulPings
+    } else {
+        $averageRTT = 0
+    }
 
+    # Log packet loss or high latency if detected
+    $packetLossPercentage = (($pingCount - $successfulPings) / $pingCount) * 100
     if ($packetLossPercentage -gt 0) {
         $issueMessages += "ICMP ping: $packetLossPercentage% packet loss detected. Avg RTT: $averageRTT ms (Min: $minRTT ms, Max: $maxRTT ms)"
         $issuesDetected = $true
@@ -58,7 +74,6 @@ function Check-Network {
 
     # Check DNS resolution
     try {
-        Write-Host "Checking DNS resolution..."
         [System.Net.Dns]::GetHostEntry("www.google.com")
     }
     catch {
@@ -68,7 +83,6 @@ function Check-Network {
 
     # Check HTTP connectivity
     try {
-        Write-Host "Checking HTTP connectivity..."
         $client = New-Object System.Net.WebClient
         $client.DownloadString("http://www.google.com")
     }
@@ -79,7 +93,6 @@ function Check-Network {
 
     # Check TCP port availability
     try {
-        Write-Host "Checking TCP port availability..."
         $tcpClient = New-Object System.Net.Sockets.TcpClient
         $tcpClient.Connect("www.google.com", 80)
     }
@@ -90,10 +103,9 @@ function Check-Network {
 
     # Check VPN connectivity if VPN is running
     try {
-        Write-Host "Checking VPN connectivity..."
         $vpnConnection = Get-VpnConnection -AllUserConnection
         if ($vpnConnection -ne $null -and $vpnConnection.ConnectionStatus -eq 'Connected') {
-            Write-Host "VPN connection is running."
+            # No issues with VPN
         } else {
             $issueMessages += "VPN connection is not running."
         }
@@ -117,25 +129,19 @@ if (-not (Test-Path $logDirectory)) {
 
 $logFilePath = Join-Path $logDirectory "network_log.txt"
 
+$backoffTime = 10  # Start with a 10 second delay
+
 while ($true) {
-    try {
-        Write-Host "Checking network..."
-        $networkIssues = Check-Network
+    $networkIssues = Check-Network
 
-        if ($networkIssues) {
-            $errorDetails = Get-Content -Path $logFilePath -Tail 1
-            Write-Host "Network issues detected:`r`n$errorDetails"
-        } else {
-            Write-Host "No network issues detected."
-            $noIssuesLog = "[$(Get-Date)] No network issues detected."
-            Log-ToFile -Path $logFilePath -Message $noIssuesLog
-        }
+    if ($networkIssues) {
+        $errorDetails = Get-Content -Path $logFilePath -Tail 1
+        Write-Host "Network issues detected:`r`n$errorDetails"
+        $backoffTime = [Math]::Min(300, $backoffTime * 2)  # Double the backoff time, but cap it at 300 seconds (5 minutes)
+    } else {
+        Write-Host "No network issues detected."
+        $backoffTime = 10  # Reset backoff time to 10 seconds
+    }
 
-        Write-Host "Waiting for the next check..."
-        Start-Sleep -Seconds 10
-    }
-    catch {
-        $errorMessage = "[$(Get-Date)] Error: $($_.Exception.Message)"
-        Log-ToFile -Path $logFilePath -Message $errorMessage
-    }
+    Start-Sleep -Seconds $backoffTime
 }
