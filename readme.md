@@ -1,48 +1,71 @@
-## Network Monitoring Script
+# Network Diagnostic Script
 
-This PowerShell script is designed to monitor network connectivity for a remote work environment and log any detected issues. The script performs various checks, including ICMP ping, DNS resolution, HTTP connectivity, and TCP port availability. It also includes a basic check for VPN connectivity if a VPN connection is running.
+This PowerShell script is designed to diagnose common network issues, including ICMP ping failures, high latency, HTTP connectivity problems, TCP port availability, and VPN connectivity status. The results are logged, and any detected issues are printed in the PowerShell console.
 
-## Purpose
+## Table of Contents
 
-In a fully remote work environment, maintaining reliable network connectivity is crucial for ensuring smooth operations. This script helps monitor network health and identifies potential issues that might affect remote employees' productivity.
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Functions Overview](#functions-overview)
+- [Configuration](#configuration)
+- [Logs](#logs)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
-- Regularly checks network connectivity using ICMP ping, DNS resolution, HTTP connectivity, and TCP port availability.
-- Logs detected network issues to a log file, including timestamp and details of the issue.
-- Supports log rotation to manage log file size.
+- **ICMP Ping Check**: Detects if there's a failure in ICMP pings to `www.google.com`.
+- **Packet Loss Percentage**: If ICMP ping fails, it checks for the percentage of packet loss.
+- **High Latency Check**: Determines if the network latency exceeds a specified threshold.
+- **HTTP Connectivity**: Checks for successful HTTP connectivity to `www.google.com`.
+- **TCP Port Availability**: Verifies if TCP port 80 on `www.google.com` is reachable.
+- **VPN Connectivity**: Assesses if the VPN connection is running.
+- **Logging**: Logs details of detected issues and rotates log files if they exceed a size of 10MB.
+
+## Prerequisites
+
+- Windows OS (The script is written in PowerShell).
+- VPN configurations (if you want to check VPN connectivity).
+
+## Installation
+
+1. Clone this repository or download the script to your local machine.
+2. Ensure PowerShell is available on your system.
+3. Navigate to the directory containing the script.
 
 ## Usage
 
-1. **Requirements**: Make sure you have PowerShell installed on the system where you intend to run this script.
+1. Open PowerShell as an administrator.
+2. Navigate to the script's directory.
+3. Execute the script:
 
-2. **Configuration**: The script doesn't require extensive configuration. However, you can adjust the log directory and log rotation settings in the script if needed.
+```powershell
+.\script_name.ps1
 
-3. **Running the Script**: Open a PowerShell terminal and navigate to the directory containing the script. Run the script using the command:
+The script will run in a loop, checking the network parameters and logging any detected issues. Detected issues will also be displayed in the PowerShell console.
 
-   ```powershell
-   .\NetworkMonitoringScript.ps1
-   ```
+Functions Overview
+Log-ToFile: Logs messages to a specified file and handles file rotation if the size exceeds the limit.
+Check-ICMPPing: Checks ICMP ping to www.google.com and detects any failures.
+Check-PacketLossPercentage: Calculates the percentage of packet loss if ICMP ping fails.
+Check-Latency: Checks for high latency in the network.
+Check-HTTPConnectivity: Verifies HTTP connectivity to www.google.com.
+Check-TCPPortAvailability: Validates if TCP port 80 on www.google.com is available.
+Check-VPNConnectivity: Checks the status of the VPN connection.
+Check-Network: Main function that utilizes the above functions to check various network parameters.
+Configuration
+Certain parameters in the script can be adjusted for your specific environment:
 
-4. **Termination**: The script runs indefinitely, periodically checking network connectivity. To stop the script, press `Ctrl + C` in the PowerShell terminal.
+Latency Threshold: The threshold for high latency can be adjusted in the Check-Latency function. The default is set to 200 milliseconds.
+Ping Timeout: In functions like Check-ICMPPing, the timeout for a ping request is set to 1000 milliseconds. Adjust as necessary.
+Log Directory: The directory where log files are saved is set to "Logs". Modify this if needed.
+Logs
+The script maintains a log file named network_log.txt in a directory called "Logs". If a log file exceeds 10MB, it will be renamed with a timestamp, and a new log file will be created.
 
-## Customization
+Contributing
+Contributions are welcome! Please fork the repository and create a pull request with your changes.
 
-- You can customize the network checks in the `Check-Network` function to match your network environment's specifics.
-- Adjust log rotation settings based on your preferred file size and retention policies.
-
-## Notifications and Improvements
-
-- To receive notifications about network issues, consider integrating a notification mechanism (e.g., email, Slack, or SMS).
-- Enhance the script to support more advanced checks, such as checking for specific services or endpoints relevant to your remote work setup.
-- Regularly review and adapt the script based on feedback and changing network conditions.
-
-## Disclaimer
-
-This script provides basic network monitoring functionality and may require further adaptation to fully meet the needs of your remote work environment. Test the script in a controlled environment before deploying it to production.
-
-## Author
-
-Aaron Fuller
-aaron.fuller@pharmacentra.com
-08/24/2023
+License
+This script is released under the MIT License. Please refer to the LICENSE file for more details.
