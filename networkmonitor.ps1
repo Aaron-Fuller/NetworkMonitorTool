@@ -22,52 +22,6 @@ function Log-ToFile {
     }
 }
 
-# Check DNS using multiple domains and DNS servers
-function Check-DNS {
-    $issuesDetected = $false
-    $issueMessages = @()
-    $domainsToCheck = @("www.google.com", "www.microsoft.com", "www.openai.com")
-    $dnsServers = @("8.8.8.8", "8.8.4.4", "208.67.222.222")  # Google and OpenDNS servers
-
-    foreach ($domain in $domainsToCheck) {
-        foreach ($server in $dnsServers) {
-            # Start a job to check DNS resolution
-            $job = Start-Job -ScriptBlock {
-                param($domain, $server)
-                Resolve-DnsName -Name $domain -Server $server
-            } -ArgumentList $domain, $server
-
-            # Wait for job to complete with a 3 second timeout
-            Wait-Job $job -Timeout 3
-
-            # If job is still running (i.e., it's hung), stop it
-            if ($job.State -eq "Running") {
-                Stop-Job $job
-                $issueMessages += "DNS resolution timeout for $domain using server $server. Possible network loss."
-                $issuesDetected = $true
-            } else {
-                # Check the result of the job
-                $result = Receive-Job -Job $job
-                if (-not $result) {
-                    $issueMessages += "DNS resolution failed for $domain using server $server."
-                    $issuesDetected = $true
-                }
-            }
-
-            # Clean up the job
-            Remove-Job $job
-        }
-    }
-
-    # Log the DNS issues if any
-    if ($issuesDetected) {
-        $logMessage = "[$(Get-Date)] DNS check results:`r`n$($issueMessages -join "`r`n")"
-        Log-ToFile -Path $logFilePath -Message $logMessage
-    }
-
-    return $issuesDetected
-}
-
 # ICMP Ping Check
 function Check-ICMPPing {
     Write-Host "Running Check-ICMPPing..."
@@ -79,7 +33,9 @@ function Check-ICMPPing {
         $pingResults = $ping.Send("www.google.com", 1000)  # Set timeout to 1000 milliseconds
 
         if ($pingResults.Status -ne [System.Net.NetworkInformation.IPStatus]::Success) {
-            $issueMessages += "ICMP ping failed: Packet loss detected."
+            # Check packet loss percentage if ICMP ping failed
+            $packetLossPercentage = Check-PacketLossPercentage
+            $issueMessages += "ICMP ping failed: Detected $packetLossPercentage% packet loss."
             $issuesDetected = $true
         }
     }
@@ -96,6 +52,61 @@ function Check-ICMPPing {
     }
 
     return $issuesDetected
+}
+
+# Check Packet Loss Percentage
+function Check-PacketLossPercentage {
+    Write-Host "Running Check-PacketLossPercentage..."
+    $totalPings = 10
+    $failedPings = 0
+    $ping = New-Object System.Net.NetworkInformation.Ping
+
+    1..$totalPings | ForEach-Object {
+        $pingResults = $ping.Send("www.google.com", 1000)  # Set timeout to 1000 milliseconds
+        if ($pingResults.Status -ne [System.Net.NetworkInformation.IPStatus]::Success) {
+            $failedPings++
+        }
+    }
+
+    $packetLossPercentage = ($failedPings / $totalPings) * 100
+    return $packetLossPercentage
+}
+
+# Check for High Latency
+function Check-Latency {
+    param (
+        [int]$threshold = 150  # Default threshold set to 150 milliseconds
+    )
+
+    Write-Host "Running Check-Latency..."
+    $highLatencyDetected = $false
+    $issueMessages = @()
+
+    try {
+        $ping = New-Object System.Net.NetworkInformation.Ping
+        $pingResults = $ping.Send("www.google.com", 1000)  # Set timeout to 1000 milliseconds
+
+        if ($pingResults.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
+            $latency = $pingResults.RoundtripTime
+            if ($latency -gt $threshold) {
+                $issueMessages += "High latency detected: $latency ms."
+                $highLatencyDetected = $true
+            }
+        }
+    }
+    catch {
+        # Adjust the error message to be more user-friendly
+        $issueMessages += "Latency check error: Unable to send ICMP request."
+        $highLatencyDetected = $true
+    }
+
+    # Log the latency issues if any
+    if ($highLatencyDetected) {
+        $logMessage = "[$(Get-Date)] Latency check results:`r`n$($issueMessages -join "`r`n")"
+        Log-ToFile -Path $logFilePath -Message $logMessage
+    }
+
+    return $highLatencyDetected
 }
 
 # HTTP Connectivity Check
@@ -176,6 +187,7 @@ function Check-VPNConnectivity {
 # Check various network parameters and log any detected issues
 function Check-Network {
     $issuesDetected = $false
+    $issueMessages = @()
 
     # ICMP Ping Check
     $pingIssues = Check-ICMPPing
@@ -183,9 +195,9 @@ function Check-Network {
         $issuesDetected = $true
     }
 
-    # DNS Check
-    $dnsIssues = Check-DNS
-    if ($dnsIssues) {
+    # Latency Check
+    $latencyIssues = Check-Latency
+    if ($latencyIssues) {
         $issuesDetected = $true
     }
 
@@ -207,7 +219,27 @@ function Check-Network {
         $issuesDetected = $true
     }
 
-    return $issuesDetected
+    # Aggregate all the issue messages
+    if ($issuesDetected) {
+        $issueMessages += "Network issues detected:`r`n"
+        if ($pingIssues) {
+            $issueMessages += (Get-Content -Path $logFilePath | Select-Object -Last 1)
+        }
+        if ($latencyIssues) {
+            $issueMessages += (Get-Content -Path $logFilePath | Select-Object -Last 1)
+        }
+        if ($httpIssues) {
+            $issueMessages += (Get-Content -Path $logFilePath | Select-Object -Last 1)
+        }
+        if ($tcpPortIssues) {
+            $issueMessages += (Get-Content -Path $logFilePath | Select-Object -Last 1)
+        }
+        if ($vpnIssues) {
+            $issueMessages += (Get-Content -Path $logFilePath | Select-Object -Last 1)
+        }
+    }
+
+    return $issuesDetected, $issueMessages -join "`r`n"
 }
 
 # Main Script
@@ -219,11 +251,10 @@ if (-not (Test-Path $logDirectory)) {
 $logFilePath = Join-Path $logDirectory "network_log.txt"
 
 while ($true) {
-    $networkIssues = Check-Network
+    $networkIssues, $errorDetails = Check-Network
 
     if ($networkIssues) {
-        $errorDetails = Get-Content -Path $logFilePath -Tail 1
-        Write-Host "Network issues detected:`r`n$errorDetails"
+        Write-Host $errorDetails
     } else {
         Write-Host "No network issues detected."
     }
