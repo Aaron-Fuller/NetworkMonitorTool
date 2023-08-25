@@ -1,33 +1,82 @@
-For a company that operates fully remote and relies heavily on network connectivity for its operations, network monitoring becomes even more crucial. Here are a few considerations and potential improvements we might want to incorporate into the script:
+# TODO for Network Diagnostic Script
 
-1. **Multiple Endpoint Checks:** Since the company operates entirely remotely, consider adding multiple endpoints in different geographic regions for network checks. This can help detect regional outages or connectivity issues that might not affect all endpoints. We can modify the `Check-Network` function to loop through an array of endpoint addresses.
+The following is a list of suggested improvements, enhancements, and features for the Network Diagnostic Script. These will serve as future tasks or enhancements to be implemented.
 
-2. **Notification Mechanisms:** Integrate a notification mechanism, such as sending an email, Slack message, or a text message, when network issues are detected. This ensures that the appropriate team members are promptly informed about connectivity problems.
+## Table of Contents
 
-3. **Logging Enhancements:**
-   - Add additional context to log entries, such as the specific check that failed and which endpoint was being checked.
-   - Consider using structured logging formats like JSON to make it easier to parse and analyze logs.
+- [Configuration Parameters](#configuration-parameters)
+- [Expand Logging](#expand-logging)
+- [Enhance Error Handling](#enhance-error-handling)
+- [Modularize Functions](#modularize-functions)
+- [External Services](#external-services)
+- [Notification System](#notification-system)
+- [Performance Optimizations](#performance-optimizations)
+- [Interactive Mode](#interactive-mode)
+- [History Analysis](#history-analysis)
+- [Integration with Monitoring Tools](#integration-with-monitoring-tools)
+- [Support for Different Environments](#support-for-different-environments)
+- [Documentation](#documentation)
 
-4. **Centralized Logging:** In a remote work environment, we could consider sending logs to a centralized logging solution or service. This allows for better aggregation, analysis, and long-term storage of logs.
+## Configuration Parameters
 
-5. **Automated Remediation:** Depending on the severity of the network issue, we could consider automating certain remediation steps. For example, if DNS resolution fails, the script could attempt to flush the DNS cache and retry.
+- **Task**: Extract hardcoded values like the threshold for high latency or the number of pings for packet loss checking into a configuration section or file.
+- **Benefit**: Easier adjustments without modifying the main logic of the script.
 
-6. **Redundancy and Failover:** Implement redundant checks using different network paths or service providers to ensure that connectivity issues are not due to a single point of failure.
+## Expand Logging
 
-7. **Customization for Remote Work:** Tailor the script to accommodate remote work conditions. For example, if employees are using VPNs or specific services, make sure to include relevant checks.
+- **Task**: Improve the logging mechanism to include more diagnostic information, such as average latency for every check.
+- **Benefit**: Provide a more comprehensive view of the network's status over time.
 
-8. **Resource Efficiency:** While the current script uses a loop with a sleep interval, we might consider more event-driven approaches, such as scheduling checks at fixed intervals using a task scheduler or utilizing event-based triggers from network monitoring tools.
+## Enhance Error Handling
 
-9. **Enhanced Reporting:** Develop a dashboard or report that provides an overview of historical network performance and issues over time. This can help in identifying trends and patterns.
+- **Task**: Implement specific exception handling for different types of errors.
+- **Benefit**: More graceful error management and user-friendly error messages.
 
-10. **Scalability:** Ensure that the script can handle a growing number of remote employees without introducing performance issues.
+## Modularize Functions
 
-11. **Testing and Simulation:** Regularly test the script in simulated network outage scenarios to ensure it behaves as expected and captures the appropriate information.
+- **Task**: Break down larger functions for better modularity and code reuse.
+- **Benefit**: Improved code readability and maintainability.
 
-12. **Security Considerations:** As remote work introduces new security challenges, ensure that the script and logging mechanisms adhere to security best practices, especially if sensitive information is involved.
+## External Services
 
-13. **Feedback and Adaptation:** Regularly collect feedback from remote employees regarding network issues they experience. This can help you adapt and fine-tune our monitoring approach to match real-world conditions.
+- **Task**: Add the ability to check against multiple domains or services, not just `www.google.com`.
+- **Benefit**: Ensure issues aren't localized to one domain.
 
-14. **On Startup** We need to make this program run on startup and be sure it runs in the background. Currently we have to start the task but in the future we need to have it run on start.
+## Notification System
 
-Remember that a remote work environment can introduce unique challenges, and monitoring network connectivity effectively is crucial for maintaining productivity. Continuously evaluate and adjust your approach to align with the changing needs of your fully remote workforce.
+- **Task**: Implement a notification system to alert administrators via email, SMS, or other means when network issues persist.
+- **Benefit**: Proactive response to persistent network issues.
+
+## Performance Optimizations
+
+- **Task**: Evaluate and optimize the script for performance, especially if running frequently or on systems with limited resources.
+- **Benefit**: Reduced system overhead and faster execution.
+
+## Interactive Mode
+
+- **Task**: Add an interactive mode where users can manually trigger specific checks or adjust settings on-the-fly.
+- **Benefit**: Flexibility in diagnosing issues in real-time.
+
+## History Analysis
+
+- **Task**: Implement a mechanism to analyze the log history for recurring problems.
+- **Benefit**: Gain insights into patterns and recurring network issues.
+
+## Integration with Monitoring Tools
+
+- **Task**: Integrate the script with existing network monitoring platforms or tools.
+- **Benefit**: A consolidated view of the network's health.
+
+## Support for Different Environments
+
+- **Task**: Develop versions or modules of the script for different platforms or environments beyond Windows.
+- **Benefit**: Extend the utility of the script to diverse systems.
+
+## Documentation
+
+- **Task**: Enhance the script's documentation, detailing the purpose, usage, expected inputs/outputs, and dependencies.
+- **Benefit**: Easier onboarding for new users or developers.
+
+---
+
+**Note**: Before implementing any of these tasks, it's essential to evaluate their potential impact and benefits in the context of the current environment and requirements.
