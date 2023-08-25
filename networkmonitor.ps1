@@ -22,66 +22,88 @@ function Log-ToFile {
     }
 }
 
-# Check various network parameters and log any detected issues
-function Check-Network {
+# Check DNS using multiple domains and DNS servers
+function Check-DNS {
     $issuesDetected = $false
-    $issueMessages = @() # Array to hold issue messages
+    $issueMessages = @()
+    $domainsToCheck = @("www.google.com", "www.microsoft.com", "www.openai.com")
+    $dnsServers = @("8.8.8.8", "8.8.4.4", "208.67.222.222")  # Google and OpenDNS servers
 
-    # Enhanced ICMP ping to check for packet loss and latency
-    $pingCount = 5
-    $pingTimeout = 1000  # 1 second in milliseconds
-    $ping = New-Object System.Net.NetworkInformation.Ping
+    foreach ($domain in $domainsToCheck) {
+        foreach ($server in $dnsServers) {
+            # Start a job to check DNS resolution
+            $job = Start-Job -ScriptBlock {
+                param($domain, $server)
+                Resolve-DnsName -Name $domain -Server $server
+            } -ArgumentList $domain, $server
 
-    $successfulPings = 0
-    $totalRTT = 0
-    $minRTT = [int]::MaxValue
-    $maxRTT = 0
+            # Wait for job to complete with a 3 second timeout
+            Wait-Job $job -Timeout 3
 
-    for ($i = 0; $i -lt $pingCount; $i++) {
-        try {
-            $reply = $ping.Send("www.google.com", $pingTimeout)
-            
-            if ($reply.Status -eq [System.Net.NetworkInformation.IPStatus]::Success) {
-                $successfulPings++
-                $totalRTT += $reply.RoundtripTime
-                $minRTT = [math]::Min($minRTT, $reply.RoundtripTime)
-                $maxRTT = [math]::Max($maxRTT, $reply.RoundtripTime)
+            # If job is still running (i.e., it's hung), stop it
+            if ($job.State -eq "Running") {
+                Stop-Job $job
+                $issueMessages += "DNS resolution timeout for $domain using server $server. Possible network loss."
+                $issuesDetected = $true
+            } else {
+                # Check the result of the job
+                $result = Receive-Job -Job $job
+                if (-not $result) {
+                    $issueMessages += "DNS resolution failed for $domain using server $server."
+                    $issuesDetected = $true
+                }
             }
-        }
-        catch {
-            $issueMessages += "ICMP ping error: Unable to send ping request. Network might be down."
-            $issuesDetected = $true
-            break  # Exit the loop early since there's no point in sending more pings
+
+            # Clean up the job
+            Remove-Job $job
         }
     }
 
-    # Calculate average RTT if there are successful pings
-    if ($successfulPings -gt 0) {
-        $averageRTT = $totalRTT / $successfulPings
-    } else {
-        $averageRTT = 0
+    # Log the DNS issues if any
+    if ($issuesDetected) {
+        $logMessage = "[$(Get-Date)] DNS check results:`r`n$($issueMessages -join "`r`n")"
+        Log-ToFile -Path $logFilePath -Message $logMessage
     }
 
-    # Log packet loss or high latency if detected
-    $packetLossPercentage = (($pingCount - $successfulPings) / $pingCount) * 100
-    if ($packetLossPercentage -gt 0) {
-        $issueMessages += "ICMP ping: $packetLossPercentage% packet loss detected. Avg RTT: $averageRTT ms (Min: $minRTT ms, Max: $maxRTT ms)"
-        $issuesDetected = $true
-    } elseif ($averageRTT -gt 100) {  # Assuming a threshold of 100ms for high latency.
-        $issueMessages += "ICMP ping: High latency detected. Avg RTT: $averageRTT ms (Min: $minRTT ms, Max: $maxRTT ms)"
-        $issuesDetected = $true
-    }
+    return $issuesDetected
+}
 
-    # Check DNS resolution
+# ICMP Ping Check
+function Check-ICMPPing {
+    Write-Host "Running Check-ICMPPing..."
+    $issuesDetected = $false
+    $issueMessages = @()
+
     try {
-        [System.Net.Dns]::GetHostEntry("www.google.com")
+        $ping = New-Object System.Net.NetworkInformation.Ping
+        $pingResults = $ping.Send("www.google.com", 1000)  # Set timeout to 1000 milliseconds
+
+        if ($pingResults.Status -ne [System.Net.NetworkInformation.IPStatus]::Success) {
+            $issueMessages += "ICMP ping failed: Packet loss detected."
+            $issuesDetected = $true
+        }
     }
     catch {
-        $issueMessages += "DNS resolution failed."
+        # Adjust the error message to be more user-friendly
+        $issueMessages += "ICMP ping error: Unable to send ICMP request. Possible total network loss."
         $issuesDetected = $true
     }
 
-    # Check HTTP connectivity
+    # Log the ICMP issues if any
+    if ($issuesDetected) {
+        $logMessage = "[$(Get-Date)] ICMP check results:`r`n$($issueMessages -join "`r`n")"
+        Log-ToFile -Path $logFilePath -Message $logMessage
+    }
+
+    return $issuesDetected
+}
+
+# HTTP Connectivity Check
+function Check-HTTPConnectivity {
+    Write-Host "Running Check-HTTPConnectivity..."
+    $issuesDetected = $false
+    $issueMessages = @()
+
     try {
         $client = New-Object System.Net.WebClient
         $client.DownloadString("http://www.google.com")
@@ -91,7 +113,21 @@ function Check-Network {
         $issuesDetected = $true
     }
 
-    # Check TCP port availability
+    # Log the HTTP issues if any
+    if ($issuesDetected) {
+        $logMessage = "[$(Get-Date)] HTTP connectivity check results:`r`n$($issueMessages -join "`r`n")"
+        Log-ToFile -Path $logFilePath -Message $logMessage
+    }
+
+    return $issuesDetected
+}
+
+# TCP Port Availability Check
+function Check-TCPPortAvailability {
+    Write-Host "Running Check-TCPPortAvailability..."
+    $issuesDetected = $false
+    $issueMessages = @()
+
     try {
         $tcpClient = New-Object System.Net.Sockets.TcpClient
         $tcpClient.Connect("www.google.com", 80)
@@ -101,22 +137,75 @@ function Check-Network {
         $issuesDetected = $true
     }
 
-    # Check VPN connectivity if VPN is running
+    # Log the TCP port issues if any
+    if ($issuesDetected) {
+        $logMessage = "[$(Get-Date)] TCP port availability check results:`r`n$($issueMessages -join "`r`n")"
+        Log-ToFile -Path $logFilePath -Message $logMessage
+    }
+
+    return $issuesDetected
+}
+
+# VPN Connectivity Check
+function Check-VPNConnectivity {
+    Write-Host "Running Check-VPNConnectivity..."
+    $issuesDetected = $false
+    $issueMessages = @()
+
     try {
         $vpnConnection = Get-VpnConnection -AllUserConnection
-        if ($vpnConnection -ne $null -and $vpnConnection.ConnectionStatus -eq 'Connected') {
-            # No issues with VPN
-        } else {
+        if ($vpnConnection -ne $null -and $vpnConnection.ConnectionStatus -ne 'Connected') {
             $issueMessages += "VPN connection is not running."
+            $issuesDetected = $true
         }
     }
     catch {
         $issueMessages += "Error checking VPN connectivity: $($_.Exception.Message)"
+        $issuesDetected = $true
     }
 
-    # Log all issue messages
-    $logMessage = "[$(Get-Date)] Network check results:`r`n$($issueMessages -join "`r`n")"
-    Log-ToFile -Path $logFilePath -Message $logMessage
+    # Log the VPN issues if any
+    if ($issuesDetected) {
+        $logMessage = "[$(Get-Date)] VPN connectivity check results:`r`n$($issueMessages -join "`r`n")"
+        Log-ToFile -Path $logFilePath -Message $logMessage
+    }
+
+    return $issuesDetected
+}
+
+# Check various network parameters and log any detected issues
+function Check-Network {
+    $issuesDetected = $false
+
+    # ICMP Ping Check
+    $pingIssues = Check-ICMPPing
+    if ($pingIssues) {
+        $issuesDetected = $true
+    }
+
+    # DNS Check
+    $dnsIssues = Check-DNS
+    if ($dnsIssues) {
+        $issuesDetected = $true
+    }
+
+    # HTTP Connectivity Check
+    $httpIssues = Check-HTTPConnectivity
+    if ($httpIssues) {
+        $issuesDetected = $true
+    }
+
+    # TCP Port Availability Check
+    $tcpPortIssues = Check-TCPPortAvailability
+    if ($tcpPortIssues) {
+        $issuesDetected = $true
+    }
+
+    # VPN Connectivity Check
+    $vpnIssues = Check-VPNConnectivity
+    if ($vpnIssues) {
+        $issuesDetected = $true
+    }
 
     return $issuesDetected
 }
@@ -129,19 +218,15 @@ if (-not (Test-Path $logDirectory)) {
 
 $logFilePath = Join-Path $logDirectory "network_log.txt"
 
-$backoffTime = 10  # Start with a 10 second delay
-
 while ($true) {
     $networkIssues = Check-Network
 
     if ($networkIssues) {
         $errorDetails = Get-Content -Path $logFilePath -Tail 1
         Write-Host "Network issues detected:`r`n$errorDetails"
-        $backoffTime = [Math]::Min(300, $backoffTime * 2)  # Double the backoff time, but cap it at 300 seconds (5 minutes)
     } else {
         Write-Host "No network issues detected."
-        $backoffTime = 10  # Reset backoff time to 10 seconds
     }
 
-    Start-Sleep -Seconds $backoffTime
+    Start-Sleep -Seconds 10
 }
