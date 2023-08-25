@@ -1,6 +1,6 @@
 # Network Diagnostic Script
 
-Clumsy was used for testing this script:
+Clumsy was used for testing this script by simulating network issues:
 http://jagt.github.io/clumsy/
 
 This PowerShell script is designed to diagnose common network issues, including ICMP ping failures, high latency, HTTP connectivity problems, TCP port availability, and VPN connectivity status. The results are logged, and any detected issues are printed in the PowerShell console.
