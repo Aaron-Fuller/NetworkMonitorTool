@@ -41,7 +41,7 @@ This PowerShell script is designed to diagnose common network issues, including 
 2. Navigate to the script's directory.
 3. Execute the script:
 
-```powershell
+```powershell```
 .\script_name.ps1
 
 The script will run in a loop, checking the network parameters and logging any detected issues. Detected issues will also be displayed in the PowerShell console.
