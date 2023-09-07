@@ -250,6 +250,11 @@ if (-not (Test-Path $logDirectory)) {
 
 $logFilePath = Join-Path $logDirectory "network_log.txt"
 
+# Create an empty log file if it doesn't exist
+if (-not (Test-Path $logFilePath)) {
+    New-Item -ItemType File -Path $logFilePath
+}
+
 while ($true) {
     $networkIssues, $errorDetails = Check-Network
 
