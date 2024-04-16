@@ -1,7 +1,7 @@
 # Function Definitions
 
 # Log messages to a specified file and handle file rotation if size exceeds limit
-function Log-ToFile {
+function LogToFile {
     param (
         [string]$Path,
         [string]$Message
@@ -23,8 +23,8 @@ function Log-ToFile {
 }
 
 # ICMP Ping Check
-function Check-ICMPPing {
-    Write-Host "Running Check-ICMPPing..."
+function CheckICMPPing {
+    Write-Host "Running CheckICMPPing..."
     $issuesDetected = $false
     $issueMessages = @()
 
@@ -34,7 +34,7 @@ function Check-ICMPPing {
 
         if ($pingResults.Status -ne [System.Net.NetworkInformation.IPStatus]::Success) {
             # Check packet loss percentage if ICMP ping failed
-            $packetLossPercentage = Check-PacketLossPercentage
+            $packetLossPercentage = CheckPacketLossPercentage
             $issueMessages += "ICMP ping failed: Detected $packetLossPercentage% packet loss."
             $issuesDetected = $true
         }
@@ -48,15 +48,15 @@ function Check-ICMPPing {
     # Log the ICMP issues if any
     if ($issuesDetected) {
         $logMessage = "[$(Get-Date)] ICMP check results:`r`n$($issueMessages -join "`r`n")"
-        Log-ToFile -Path $logFilePath -Message $logMessage
+        LogToFile -Path $logFilePath -Message $logMessage
     }
 
     return $issuesDetected
 }
 
 # Check Packet Loss Percentage
-function Check-PacketLossPercentage {
-    Write-Host "Running Check-PacketLossPercentage..."
+function CheckPacketLossPercentage {
+    Write-Host "Running CheckPacketLossPercentage..."
     $totalPings = 10
     $failedPings = 0
     $ping = New-Object System.Net.NetworkInformation.Ping
@@ -73,12 +73,12 @@ function Check-PacketLossPercentage {
 }
 
 # Check for High Latency
-function Check-Latency {
+function CheckLatency {
     param (
         [int]$threshold = 150  # Default threshold set to 150 milliseconds
     )
 
-    Write-Host "Running Check-Latency..."
+    Write-Host "Running CheckLatency..."
     $highLatencyDetected = $false
     $issueMessages = @()
 
@@ -103,15 +103,15 @@ function Check-Latency {
     # Log the latency issues if any
     if ($highLatencyDetected) {
         $logMessage = "[$(Get-Date)] Latency check results:`r`n$($issueMessages -join "`r`n")"
-        Log-ToFile -Path $logFilePath -Message $logMessage
+        LogToFile -Path $logFilePath -Message $logMessage
     }
 
     return $highLatencyDetected
 }
 
 # HTTP Connectivity Check
-function Check-HTTPConnectivity {
-    Write-Host "Running Check-HTTPConnectivity..."
+function CheckHTTPConnectivity {
+    Write-Host "Running CheckHTTPConnectivity..."
     $issuesDetected = $false
     $issueMessages = @()
 
@@ -127,15 +127,15 @@ function Check-HTTPConnectivity {
     # Log the HTTP issues if any
     if ($issuesDetected) {
         $logMessage = "[$(Get-Date)] HTTP connectivity check results:`r`n$($issueMessages -join "`r`n")"
-        Log-ToFile -Path $logFilePath -Message $logMessage
+        LogToFile -Path $logFilePath -Message $logMessage
     }
 
     return $issuesDetected
 }
 
 # TCP Port Availability Check
-function Check-TCPPortAvailability {
-    Write-Host "Running Check-TCPPortAvailability..."
+function CheckTCPPortAvailability {
+    Write-Host "Running CheckTCPPortAvailability..."
     $issuesDetected = $false
     $issueMessages = @()
 
@@ -151,71 +151,39 @@ function Check-TCPPortAvailability {
     # Log the TCP port issues if any
     if ($issuesDetected) {
         $logMessage = "[$(Get-Date)] TCP port availability check results:`r`n$($issueMessages -join "`r`n")"
-        Log-ToFile -Path $logFilePath -Message $logMessage
+        LogToFile -Path $logFilePath -Message $logMessage
     }
 
     return $issuesDetected
 }
 
-# VPN Connectivity Check
-function Check-VPNConnectivity {
-    Write-Host "Running Check-VPNConnectivity..."
-    $issuesDetected = $false
-    $issueMessages = @()
-
-    try {
-        $vpnConnection = Get-VpnConnection -AllUserConnection
-        if ($vpnConnection -ne $null -and $vpnConnection.ConnectionStatus -ne 'Connected') {
-            $issueMessages += "VPN connection is not running."
-            $issuesDetected = $true
-        }
-    }
-    catch {
-        $issueMessages += "Error checking VPN connectivity: $($_.Exception.Message)"
-        $issuesDetected = $true
-    }
-
-    # Log the VPN issues if any
-    if ($issuesDetected) {
-        $logMessage = "[$(Get-Date)] VPN connectivity check results:`r`n$($issueMessages -join "`r`n")"
-        Log-ToFile -Path $logFilePath -Message $logMessage
-    }
-
-    return $issuesDetected
-}
 
 # Check various network parameters and log any detected issues
-function Check-Network {
+function CheckNetwork {
     $issuesDetected = $false
     $issueMessages = @()
 
     # ICMP Ping Check
-    $pingIssues = Check-ICMPPing
+    $pingIssues = CheckICMPPing
     if ($pingIssues) {
         $issuesDetected = $true
     }
 
     # Latency Check
-    $latencyIssues = Check-Latency
+    $latencyIssues = CheckLatency
     if ($latencyIssues) {
         $issuesDetected = $true
     }
 
     # HTTP Connectivity Check
-    $httpIssues = Check-HTTPConnectivity
+    $httpIssues = CheckHTTPConnectivity
     if ($httpIssues) {
         $issuesDetected = $true
     }
 
     # TCP Port Availability Check
-    $tcpPortIssues = Check-TCPPortAvailability
+    $tcpPortIssues = CheckTCPPortAvailability
     if ($tcpPortIssues) {
-        $issuesDetected = $true
-    }
-
-    # VPN Connectivity Check
-    $vpnIssues = Check-VPNConnectivity
-    if ($vpnIssues) {
         $issuesDetected = $true
     }
 
@@ -232,9 +200,6 @@ function Check-Network {
             $issueMessages += (Get-Content -Path $logFilePath | Select-Object -Last 1)
         }
         if ($tcpPortIssues) {
-            $issueMessages += (Get-Content -Path $logFilePath | Select-Object -Last 1)
-        }
-        if ($vpnIssues) {
             $issueMessages += (Get-Content -Path $logFilePath | Select-Object -Last 1)
         }
     }
@@ -256,7 +221,7 @@ if (-not (Test-Path $logFilePath)) {
 }
 
 while ($true) {
-    $networkIssues, $errorDetails = Check-Network
+    $networkIssues, $errorDetails = CheckNetwork
 
     if ($networkIssues) {
         Write-Host $errorDetails
